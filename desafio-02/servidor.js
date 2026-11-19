@@ -44,6 +44,13 @@ function comprar(numeroSerie, resposta) {
     return;
   }
 
+  // CORREÇÃO: depois de vender, o estado tem de passar a "vendido" e ficar guardado no ficheiro.
+  // Antes, a compra era aceite mas o inventário ficava igual ("pronto"), por isso o mesmo
+  // equipamento podia ser vendido outra vez. Como a leitura, a verificação e a gravação são
+  // síncronas (sem await pelo meio), nenhuma outra compra consegue entrar a meio deste processo.
+  equipamento.estado = "vendido";
+  guardarInventario(equipamentos);
+
   responderJSON(resposta, 200, { mensagem: "Compra efetuada: " + equipamento.nome });
 }
 
