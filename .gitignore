@@ -1,5 +1,0 @@
-node_modules/
-*.tmp
-dados/inventario.json
-dados/vendas.json
-.DS_Store
