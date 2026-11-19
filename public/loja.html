@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loja online — Inventário</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <header>
+    <h1>Loja online</h1>
+    <nav>
+      <a href="/">Início</a>
+      <a href="oficina.html">Oficina</a>
+      <a href="loja.html" class="ativo">Loja online</a>
+      <a href="vendas.html">Vendas do ano</a>
+    </nav>
+    <div class="etiquetas"><span id="ligacao" class="ligacao off">Socket: não usado</span><span id="modo" class="modo">…</span></div>
+  </header>
+
+  <main>
+    <h2><span class="estacao">E4</span>De onde vem a informação do stock?</h2>
+    <div id="origem" class="origem">A carregar…</div>
+
+    <div class="barra">
+      <label for="cliente">O seu número de cliente:</label>
+      <input id="cliente" value="C-205" maxlength="20" style="width:110px">
+      <button class="btn-sec" onclick="carregar()">Atualizar página</button>
+    </div>
+
+    <div id="mensagem"></div>
+    <div class="produtos" id="produtos"></div>
+    <p class="nota" id="vazio" style="display:none">Não há equipamentos disponíveis neste momento.</p>
+  </main>
+
+  <div class="aviso-flutuante" id="aviso"></div>
+
+  <script src="comum.js"></script>
+  <script>
+    let modo = null;
+    let ultimaAtualizacao = null;
+
+    async function carregar() {
+      // A lista vem do SERVIDOR, mas só no momento em que este pedido é feito.
+      const r = await obterJSON('/api/inventario');
+      modo = r.dados.modo;
+      mostrarModo(modo);
+      ultimaAtualizacao = hora();
+
+      const disponiveis = r.dados.inventario.filter((e) => e.estado === 'pronto');
+      const lista = document.getElementById('produtos');
+      lista.innerHTML = '';
+      for (const eq of disponiveis) {
+        lista.append(el('div', { class: 'produto' },
+          el('div', { class: 'nota', text: 'Ref. ' + eq.id }),
+          el('div', { class: 'nome', text: eq.equipamento }),
+          el('div', { class: 'preco', text: eq.preco + ' €' }),
+          el('div', {}, etiquetaEstado(eq.estado)),
+          el('button', { class: 'btn-principal', text: 'Comprar', onclick: () => comprar(eq.id) })
+        ));
+      }
+      document.getElementById('vazio').style.display = disponiveis.length ? 'none' : 'block';
+      explicarOrigem();
+    }
+
+    function explicarOrigem() {
+      const caixa = document.getElementById('origem');
+      caixa.innerHTML = '';
+      if (modo === 'erro') {
+        caixa.className = 'origem erro';
+        caixa.append(
+          el('b', { text: 'A lista vem do servidor, mas só uma vez: ' }),
+          `foi pedida às ${ultimaAtualizacao} e ficou guardada nesta página. `,
+          'Se outro cliente comprar entretanto, esta página não sabe e continua a mostrar o equipamento como disponível.'
+        );
+      } else {
+        caixa.className = 'origem corrigido';
+        caixa.append(
+          el('b', { text: 'A lista vem do servidor e mantém-se atualizada: ' }),
+          `esta página está ligada por socket e volta a pedir o stock sempre que algo muda (última atualização às ${ultimaAtualizacao}). `,
+          'Mesmo assim, quem decide se a venda é aceite é o servidor.'
+        );
+      }
+    }
+
+    async function comprar(id) {
+      const cliente = document.getElementById('cliente').value.trim();
+      const r = await enviarJSON('/api/vender', { id, cliente });
+      mostrarMensagem(r.ok ? r.dados.mensagem : r.dados.erro, r.ok);
+      await carregar();
+    }
+
+    function avisar(texto) {
+      const aviso = document.getElementById('aviso');
+      aviso.textContent = texto;
+      aviso.style.display = 'block';
+      clearTimeout(avisar.temporizador);
+      avisar.temporizador = setTimeout(() => (aviso.style.display = 'none'), 4000);
+    }
+
+    (async () => {
+      await carregar();
+      // Só a versão corrigida ouve o servidor em tempo real
+      if (modo === 'corrigido') {
+        ligarSocket({
+          aoMudarLigacao: mostrarLigacao,
+          aoReceber: (mensagem) => {
+            if (mensagem.tipo === 'estadoAlterado' && mensagem.estado === 'vendido') {
+              avisar(`O ${mensagem.equipamento.equipamento} acabou de ser vendido.`);
+            }
+            if (['estadoAlterado', 'equipamentoAdicionado', 'inventarioReposto'].includes(mensagem.tipo)) carregar();
+          },
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

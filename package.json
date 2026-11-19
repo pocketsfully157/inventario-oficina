@@ -1,0 +1,15 @@
+{
+  "name": "inventario-oficina",
+  "version": "1.0.0",
+  "description": "Inventário da oficina — demonstração da venda duplicada e da correção (E2)",
+  "main": "server.js",
+  "scripts": {
+    "erro": "node server.js erro",
+    "corrigido": "node server.js corrigido",
+    "teste": "node teste-venda-dupla.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

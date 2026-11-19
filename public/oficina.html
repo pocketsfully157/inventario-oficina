@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oficina — Inventário</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <header>
+    <h1>Aplicação da oficina</h1>
+    <nav>
+      <a href="/">Início</a>
+      <a href="oficina.html" class="ativo">Oficina</a>
+      <a href="loja.html">Loja online</a>
+      <a href="vendas.html">Vendas do ano</a>
+    </nav>
+    <div class="etiquetas"><span id="ligacao" class="ligacao off">Socket: a ligar…</span><span id="modo" class="modo">…</span></div>
+  </header>
+
+  <main>
+    <!-- E1 -->
+    <h2><span class="estacao">E1</span>Estados por que passa um equipamento e quando mudam</h2>
+    <div class="cartao">
+      <div class="diagrama">
+        <div class="caixa-estado em_reparacao">Em reparação</div>
+        <div class="seta"><b>→</b>reparação concluída e testada</div>
+        <div class="caixa-estado pronto">Pronto<br><span class="nota">disponível para venda</span></div>
+        <div class="seta"><b>→</b>venda confirmada (pagamento feito)</div>
+        <div class="caixa-estado vendido">Vendido<br><span class="nota">estado final</span></div>
+      </div>
+      <p class="nota" style="text-align:center">Entrada na oficina → <b>Em reparação</b>. De <b>Pronto</b> pode voltar a <b>Em reparação</b> se for detetado um defeito. <b>Vendido</b> não muda mais: não pode ser vendido outra vez.</p>
+    </div>
+
+    <div id="mensagem"></div>
+
+    <div class="grelha">
+      <div>
+        <h2>Inventário <span class="nota">(clique numa linha para ver o registo)</span></h2>
+        <table class="clicavel">
+          <thead><tr><th>ID</th><th>Equipamento</th><th>Preço (€)</th><th>Estado</th><th>Cliente</th><th>Ações</th></tr></thead>
+          <tbody id="tabela"></tbody>
+        </table>
+
+        <h2>Entrada de um equipamento</h2>
+        <form id="formulario" class="barra cartao">
+          <input id="novoNome" placeholder="Nome do equipamento" maxlength="50" required style="flex:1;min-width:180px">
+          <input id="novoPreco" type="number" placeholder="Preço €" min="0" max="10000" step="1" required style="width:110px">
+          <button class="btn-principal" type="submit">Dar entrada</button>
+        </form>
+      </div>
+
+      <div>
+        <!-- E2 -->
+        <h2><span class="estacao">E2</span>Registo no ficheiro de dados</h2>
+        <div class="cartao">
+          <p class="nota" id="tituloRegisto">—</p>
+          <pre id="registo"></pre>
+          <p class="nota">O campo <b>estado</b> está destacado. Quando o equipamento é vendido mudam <b>estado</b>, <b>dataVenda</b> e <b>cliente</b>.</p>
+          <h3 style="font-size:15px;margin:14px 0 0">Histórico de estados (E1)</h3>
+          <ul class="linha-tempo" id="historico"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- E3 -->
+    <h2><span class="estacao">E3</span>Mensagens trocadas com o servidor (socket)</h2>
+    <div class="cartao">
+      <p class="nota">Cada ação nesta página é enviada ao servidor por WebSocket (➡). O servidor responde e avisa <b>todos</b> os browsers ligados (⬅), incluindo a loja.</p>
+      <div class="registo" id="registoSocket"></div>
+    </div>
+  </main>
+
+  <script src="comum.js"></script>
+  <script>
+    const ACOES = {
+      em_reparacao: [{ estado: 'pronto', texto: 'Marcar pronto' }],
+      pronto: [{ estado: 'vendido', texto: 'Vender ao balcão' }, { estado: 'em_reparacao', texto: 'Voltar à reparação' }],
+      vendido: [],
+    };
+
+    let inventario = [];
+    let selecionado = 1042;
+
+    const socket = ligarSocket({
+      aoMudarLigacao: mostrarLigacao,
+      aoEnviar: (mensagem, texto) => registarSocket('enviado', '➡ enviado', texto),
+      aoReceber: (mensagem, texto) => {
+        registarSocket('recebido', '⬅ recebido', texto);
+        if (mensagem.tipo === 'boasVindas') mostrarModo(mensagem.modo);
+        if (['estadoAlterado', 'equipamentoAdicionado', 'inventarioReposto'].includes(mensagem.tipo)) carregar();
+      },
+    });
+
+    function registarSocket(classe, sentido, texto) {
+      const caixa = document.getElementById('registoSocket');
+      caixa.prepend(el('div', { class: classe }, el('span', { class: 'hora', text: hora(true) }), `${sentido}: ${texto}`));
+      while (caixa.children.length > 60) caixa.lastChild.remove();
+    }
+
+    async function carregar() {
+      const r = await obterJSON('/api/inventario');
+      mostrarModo(r.dados.modo);
+      inventario = r.dados.inventario;
+      desenharTabela();
+      desenharRegisto();
+    }
+
+    function desenharTabela() {
+      const tabela = document.getElementById('tabela');
+      tabela.innerHTML = '';
+      for (const eq of inventario) {
+        const acoes = el('td');
+        for (const acao of ACOES[eq.estado] || []) {
+          acoes.append(el('button', {
+            class: 'btn-pequeno ' + (acao.estado === 'vendido' ? 'btn-principal' : 'btn-sec'),
+            text: acao.texto,
+            onclick: (evento) => { evento.stopPropagation(); mudar(eq.id, acao.estado); },
+          }));
+        }
+        const linha = el('tr', { class: eq.id === selecionado ? 'selecionado' : '' },
+          el('td', { text: eq.id }),
+          el('td', { text: eq.equipamento }),
+          el('td', { text: eq.preco }),
+          el('td', {}, etiquetaEstado(eq.estado)),
+          el('td', { text: eq.cliente || '—' }),
+          acoes
+        );
+        linha.onclick = () => { selecionado = eq.id; desenharTabela(); desenharRegisto(); };
+        tabela.append(linha);
+      }
+    }
+
+    function desenharRegisto() {
+      const eq = inventario.find((e) => e.id === selecionado) || inventario[0];
+      if (!eq) return;
+      document.getElementById('tituloRegisto').textContent = `dados/inventario.json — equipamento ${eq.id}`;
+
+      // Mostra o registo sem o histórico, com a linha do "estado" destacada
+      const { historico, ...registo } = eq;
+      const pre = document.getElementById('registo');
+      pre.innerHTML = '';
+      for (const linha of JSON.stringify(registo, null, 2).split('\n')) {
+        const marcar = /"(estado|dataVenda|cliente)"/.test(linha) && (linha.includes('"estado"') || eq.estado === 'vendido');
+        pre.append(marcar ? el('span', { class: 'destaque', text: linha }) : linha, '\n');
+      }
+
+      const lista = document.getElementById('historico');
+      lista.innerHTML = '';
+      for (const passo of historico || []) {
+        lista.append(el('li', {},
+          etiquetaEstado(passo.estado), ' ',
+          el('span', { class: 'quando', text: `${passo.data} · ${passo.origem}` }),
+          el('div', { text: passo.motivo })
+        ));
+      }
+    }
+
+    async function mudar(id, estado) {
+      const r = await socket.enviar({ tipo: 'mudarEstado', id, estado });
+      mostrarMensagem(r.ok ? r.mensagem : r.erro, r.ok);
+      selecionado = id;
+    }
+
+    document.getElementById('formulario').onsubmit = async (evento) => {
+      evento.preventDefault();
+      const r = await socket.enviar({
+        tipo: 'adicionar',
+        equipamento: document.getElementById('novoNome').value,
+        preco: Number(document.getElementById('novoPreco').value),
+      });
+      mostrarMensagem(r.ok ? r.mensagem : r.erro, r.ok);
+      if (r.ok) { selecionado = r.equipamento.id; evento.target.reset(); }
+    };
+
+    carregar();
+  </script>
+</body>
+</html>

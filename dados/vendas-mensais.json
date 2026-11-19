@@ -1,0 +1,18 @@
+{
+  "descricao": "Equipamentos vendidos por mês em 2025 (dados de exemplo para a E5)",
+  "ano": 2025,
+  "meses": [
+    { "mes": 1,  "vendas": 56, "anuladas": 1 },
+    { "mes": 2,  "vendas": 49, "anuladas": 0 },
+    { "mes": 3,  "vendas": 41, "anuladas": 0 },
+    { "mes": 4,  "vendas": 31, "anuladas": 0 },
+    { "mes": 5,  "vendas": 23, "anuladas": 0 },
+    { "mes": 6,  "vendas": 20, "anuladas": 0 },
+    { "mes": 7,  "vendas": 22, "anuladas": 0 },
+    { "mes": 8,  "vendas": 28, "anuladas": 0 },
+    { "mes": 9,  "vendas": 57, "anuladas": 1 },
+    { "mes": 10, "vendas": 51, "anuladas": 1 },
+    { "mes": 11, "vendas": 80, "anuladas": 4 },
+    { "mes": 12, "vendas": 63, "anuladas": 2 }
+  ]
+}
