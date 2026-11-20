@@ -1,123 +1,100 @@
-# Desafio 2 — «O cliente comprou um que já não existe» · Equipa 4EH
+# Inventário da oficina — Desafio 2
 
-Trabalho do **grupo 1** para o desafio 2 do **SkillLABS 1** (Inforlândia). O código base é o do repositório da turma:
-https://github.com/Hugo1307/EPA-SkillLabs-4EH/tree/main/desafio-02
+**«O cliente comprou um que já não existe»**: um computador foi vendido duas vezes no site, porque a segunda venda aconteceu quando o equipamento já tinha saído do inventário.
 
-> **O desafio:** um computador foi vendido duas vezes no site. A segunda venda aconteceu depois de o equipamento já ter saído do inventário. Mostrem como a equipa descobre onde está o erro e como o corrige.
-
-O histórico de commits mostra o trabalho por passos:
-
-1. **Base** — o código original, sem alterações.
-2. **Correção** — a única alteração à aplicação (7 linhas no `servidor.js`).
-3. **Apoio** — scripts para demonstrar o erro e para a análise de vendas (E5), mais este README.
-
----
+Este projeto é o sistema completo da oficina. Tem uma **versão com o erro** e uma **versão corrigida**, e cada estação do grupo tem uma página ou parte do código para demonstrar.
 
 ## Como correr
 
-Instruções completas no [README da turma](https://github.com/Hugo1307/EPA-SkillLabs-4EH#como-correr-o-código). Em resumo, com o Node.js instalado:
+É preciso ter o **Node.js 18 ou mais recente** (https://nodejs.org). Não é preciso instalar mais nada: o projeto não usa bibliotecas externas nem base de dados.
 
-```
-cd desafio-02
-node servidor.js
-```
-
-Abrir **http://localhost:3000**. Não é preciso `npm install`.
-
-### Scripts de apoio (dentro de `desafio-02/`)
-
-| Comando | O que faz |
-|---|---|
-| `node teste-compra-dupla.js` | Com o servidor a correr, dois clientes compram o INF-0004 ao mesmo tempo e um terceiro tenta mais tarde. Mostra o estado antes e depois |
-| `node repor-inventario.js` | Volta a pôr o `inventario.json` como no início (cópia em `dados/inventario-original.json`) |
-| `node analise-vendas.js` | E5: lê `dados/vendas.csv`, calcula o modelo periódico e compara com as vendas reais |
-
----
-
-## O erro
-
-Na rota `POST /comprar` (`servidor.js`, função `comprar`), o servidor **verificava** se o equipamento estava `"pronto"`, mas **nunca mudava o estado para `"vendido"` nem guardava o inventário**:
-
-```js
-if (equipamento.estado !== "pronto") {
-  responderJSON(resposta, 409, { mensagem: "Indisponível: …" });
-  return;
-}
-
-responderJSON(resposta, 200, { mensagem: "Compra efetuada: " + equipamento.nome });
-// ← o inventario.json continua com "estado": "pronto"
+```bash
+node server.js erro        # versão COM o erro
+node server.js corrigido   # versão CORRIGIDA
 ```
 
-A função `guardarInventario()` existia, mas **nunca era chamada**. Depois de cada venda o equipamento continuava `"pronto"` no ficheiro, por isso podia ser vendido outra vez, e outra, e outra.
+Depois, abrir **http://localhost:3000**. Para mudar de versão, parar o servidor com `Ctrl+C` e arrancar com o outro modo.
 
-**Como o descobrimos:** comprámos o INF-0004 e voltámos a abrir o `inventario.json`. O estado continuava `"pronto"`. No terminal, cada compra aparecia como `POST /comprar`, mas o ficheiro nunca mudava. Resultado do teste com o código original:
+**Teste automático da venda dupla** (com o servidor a correr, noutra janela do terminal):
 
+```bash
+node teste-venda-dupla.js
 ```
-Estado antes:         pronto
-Cliente A:            200 — Compra efetuada: Portátil Lenovo ThinkPad T480
-Cliente B:            200 — Compra efetuada: Portátil Lenovo ThinkPad T480
-Estado depois:        pronto
-Cliente C (depois):   200 — Compra efetuada: Portátil Lenovo ThinkPad T480
-```
-
-## A correção
-
-Duas linhas antes de responder ao cliente:
-
-```js
-equipamento.estado = "vendido";
-guardarInventario(equipamentos);
-```
-
-Resultado do mesmo teste depois da correção:
-
-```
-Estado antes:         pronto
-Cliente A:            200 — Compra efetuada: Portátil Lenovo ThinkPad T480
-Cliente B:            409 — Indisponível: o equipamento está vendido.
-Estado depois:        vendido
-Cliente C (depois):   409 — Indisponível: o equipamento está vendido.
-```
-
-### Fundamentar a decisão (Fase B)
-
-- **Critério:** corrigir no **servidor**, que é onde está o inventário (a fonte da verdade), com a menor alteração possível. São duas linhas e usam uma função que já existia.
-- **Porque funciona mesmo com duas compras ao mesmo tempo:** `lerInventario()` e `guardarInventario()` usam `readFileSync` e `writeFileSync` (síncronos). O Node só tem uma linha de execução, por isso ler → verificar → gravar corre do princípio ao fim sem que outro pedido entre no meio.
-- **Alternativa rejeitada:** corrigir só na página (`script.js`), por exemplo atualizando a lista mais vezes ou desativando o botão. Foi rejeitada porque uma página aberta antes da venda continua desatualizada, e qualquer pessoa pode enviar o pedido `POST /comprar` diretamente. A página ajuda, mas quem decide tem de ser o servidor.
-- **O que mudámos pelo caminho:** ao início pensámos que faltava verificar o estado. Ao ler o código vimos que a verificação já existia. O que faltava era **gravar** o novo estado.
-- **Condição que tornaria a correção insuficiente:**
-  - se a leitura ou a gravação passassem a ser **assíncronas** (`await fs.promises…`), porque duas compras podiam ler `"pronto"` antes de alguma gravar;
-  - se houvesse **vários servidores** a usar o mesmo inventário, porque seria preciso uma base de dados com transações;
-  - se houvesse **várias unidades do mesmo modelo**, porque seria preciso guardar uma quantidade em vez de um só estado.
-
----
 
 ## O que cada estação mostra
 
-| Estação | Onde, neste código |
-|---|---|
-| **E1** — estados e quando mudam | Três estados no `inventario.json` e no comentário da função `comprar`: `"em reparação"` → `"pronto"` (quando a reparação acaba; neste desafio muda-se à mão no ficheiro) → `"vendido"` (no `POST /comprar`, depois da correção). `"vendido"` é final |
-| **E2** — o campo que guarda o estado | O campo `"estado"` de cada equipamento no `inventario.json`. **Antes** da correção não mudava quando havia uma venda (era esse o erro). **Depois**, passa de `"pronto"` para `"vendido"` |
-| **E3** — como a alteração chega ao servidor | Ao carregar em **Comprar**, o `script.js` envia `POST /comprar` com `{"numeroSerie": "INF-0004"}` (função `comprar`). Aparece no terminal e no separador **Rede** do F12. O servidor responde 200 ou 409 e grava o ficheiro |
-| **E4** — de onde o site vai buscar o stock | Ao **servidor**: o `script.js` faz `GET /produtos` quando a página abre e depois de cada compra, e o servidor lê o `inventario.json` em cada pedido. A página ainda mostrava o equipamento vendido porque o servidor nunca gravava `"vendido"`. Além disso, outras páginas abertas não se atualizam sozinhas |
-| **E5a / E5b** — vendas ao longo do ano | `node analise-vendas.js` com `dados/vendas.csv` (2024 e 2025). Ver abaixo |
-
-### E5 — resultados de `analise-vendas.js`
-
-**Modelo:** V(t) = 40,3 + 18,4 · cos(2π(t − 9,04)/12)
-
-- O **pico é em setembro** (t₀ ≈ 9, regresso às aulas) e o **mínimo em março**. As vendas variam entre cerca de 22 e 59 por mês.
-- O modelo acompanha bem os dados: em quase todos os meses a diferença é menor que 10%. Afasta-se mais perto do mínimo (fevereiro e março, até 14%), onde as vendas ficam "paradas" em vez de descerem e subirem como uma curva.
-- **Vendas anuladas:** a taxa é parecida em todo o ano (cerca de 6,3%), mas no pico há **mais anulações por mês** (3,3 contra 1,8). Cada uma custa mais: o cliente precisa do equipamento para o início das aulas, não tem tempo para esperar e vai à concorrência, e a equipa está mais ocupada.
-- **Onde o modelo deixa de servir:** acontecimentos que não se repetem todos os anos (crises, promoções especiais, falta de stock), previsões para um dia concreto, e o facto de serem só dois anos de dados. O modelo também não diz se um equipamento **específico** ainda existe: isso é o campo `estado` (E2).
-
----
-
-## Objeto físico: o inventário antes e depois da correção
-
-A linha em causa é a do **INF-0004**. Depois de uma compra:
-
-| | Antes da correção | Depois da correção |
+| Estação | Onde | O que mostrar |
 |---|---|---|
-| `inventario.json` | `{ "numeroSerie": "INF-0004", "nome": "Portátil Lenovo ThinkPad T480", "preco": 289, "estado": "pronto" }` | `{ "numeroSerie": "INF-0004", "nome": "Portátil Lenovo ThinkPad T480", "preco": 289, "estado": "vendido" }` |
-| Segunda compra | Aceite (200) | Recusada (409) |
+| **E1** — estados e quando mudam | Página **Oficina**, no topo e no "Histórico de estados" | Em reparação → Pronto → Vendido. Mostrar o que faz mudar cada estado e que *Vendido* é final. Nos botões, só aparecem as transições permitidas. No código: `TRANSICOES` em `server.js` |
+| **E2** — o campo que guarda o estado | Página **Oficina**, no quadro "Registo no ficheiro de dados", e o ficheiro `dados/inventario.json` | Clicar no 1042: o campo `estado` aparece destacado. Vender e ver mudar `estado`, `dataVenda` e `cliente` |
+| **E3** — como a alteração chega ao servidor | Página **Oficina**, no quadro "Mensagens trocadas com o servidor" | Clicar "Marcar pronto": aparece a mensagem **enviada** (`mudarEstado`) e as **recebidas** (`estadoAlterado` para todos os browsers, e a `resposta`), com a hora ao milissegundo. No código: `websocket.js` e a parte `E3` de `server.js` |
+| **E4** — de onde o site vai buscar o stock | Página **Loja online**, no quadro amarelo ou verde | Versão com erro: a lista vem do servidor **uma só vez** e fica guardada na página, por isso continua a mostrar o vendido. Versão corrigida: a página está ligada por socket e atualiza-se sozinha |
+| **E5a** — as vendas não são constantes | Página **Vendas do ano** | Gráfico das vendas por mês, função V(t) = D + A·cos(2π(t − t₀)/12), com os parâmetros calculados a partir dos dados |
+| **E5b** — venda anulada no pico e limites do modelo | Página **Vendas do ano**, no fundo | Taxa de anulação no pico e fora dele, porque custa mais no pico, e os meses onde o modelo falha (agosto, setembro e novembro) |
+
+## Demonstração da venda dupla (para todo o grupo)
+
+1. `node server.js erro` e abrir a **Loja online** em **dois separadores**.
+2. No primeiro, comprar o Lenovo ThinkPad T480 (1042) com o cliente C-205.
+3. No segundo, **sem atualizar**, mudar o cliente para C-207 e comprar o mesmo.
+4. **As duas vendas são aceites.** Na **Oficina**, o registo 1042 ficou com o cliente C-207 por cima do C-205.
+5. `node server.js corrigido` e repetir. O segundo separador **atualiza-se sozinho** e o ThinkPad desaparece. Mesmo que o pedido chegasse, o servidor recusava com «já não está disponível». O teste automático prova isto mesmo com os dois pedidos ao mesmo tempo.
+
+O botão **Repor dados iniciais**, na página Início, volta ao inventário do princípio.
+
+## Ficheiros
+
+| Ficheiro | O que é |
+|---|---|
+| `server.js` | Servidor: inventário, estados, vendas (versão com erro e corrigida), API e socket |
+| `websocket.js` | Servidor WebSocket feito à mão, sem bibliotecas (E3) |
+| `public/index.html` | Página inicial, com as ligações e os passos da demonstração |
+| `public/oficina.html` | Aplicação da oficina (E1, E2, E3) |
+| `public/loja.html` | Loja online (E4) |
+| `public/vendas.html` | Vendas do ano e modelo periódico (E5a, E5b) |
+| `public/comum.js`, `public/estilo.css` | Código e estilo partilhados pelas páginas |
+| `dados/inventario-inicial.json` | Inventário inicial, com o histórico de estados de cada equipamento |
+| `dados/inventario.json` | Inventário atual. É criado ao arrancar (E2) |
+| `dados/vendas.json` | Registo de todas as tentativas de venda, aceites e recusadas |
+| `dados/vendas-mensais.json` | Vendas por mês de 2025, com dados de exemplo (E5) |
+| `teste-venda-dupla.js` | Teste das duas vendas ao mesmo tempo |
+
+## Porquê Node.js (JavaScript)
+
+1. **Usa a mesma linguagem no servidor e no browser.** A oficina, a loja e o servidor estão todos em JavaScript, por isso as estações ligam-se sem traduções.
+2. **Tem WebSocket nativo no browser.** A E3 fala de sockets, e o browser já os tem. No servidor, o protocolo foi feito à mão (`websocket.js`), por isso não é preciso instalar nada.
+3. **O inventário é um ficheiro JSON**, que é o formato natural do JavaScript. É exatamente o "ficheiro de dados do inventário" que a E2 pede para mostrar.
+4. **Trata vários pedidos ao mesmo tempo (é assíncrono).** É isso que deixa duas vendas "entrarem no meio" uma da outra, por isso o erro acontece de verdade, como num site real.
+5. **Só precisa do Node instalado.** Corre em qualquer computador da escola.
+
+**Alternativa rejeitada: PHP + MySQL.** É muito usada em lojas online, mas precisa do XAMPP e de uma base de dados, e o PHP não tem sockets em tempo real de forma simples. Num site real com base de dados, a correção seria uma só instrução:
+
+```sql
+UPDATE equipamentos
+SET estado = 'vendido', dataVenda = NOW(), cliente = 'C-207'
+WHERE id = 1042 AND estado = 'pronto';
+-- 0 linhas alteradas = já vendido -> venda recusada
+```
+
+## Problemas que o código pode ter e como foram resolvidos
+
+| # | Problema | O que acontece | Resolução |
+|---|---|---|---|
+| 1 | **Não verifica o estado antes de vender** | Um equipamento *vendido* ou *em reparação* pode ser vendido (outra vez) | Só aceita transições permitidas (`TRANSICOES`): só se vende o que está *pronto*. Se não, recusa com HTTP 409 |
+| 2 | **Duas vendas ao mesmo tempo (condição de corrida)** | As duas leem *pronto*, as duas gravam, e a segunda escreve o cliente por cima do primeiro | As alterações passam por uma **fila**, uma de cada vez: ler, verificar e gravar acontecem sem interrupção |
+| 3 | **Página da loja desatualizada** | Num separador antigo, o equipamento vendido continua à venda | A loja corrigida ouve o servidor por socket e atualiza-se. E quem decide é sempre o **servidor** |
+| 4 | **Transições impossíveis** | Passar de *vendido* para *em reparação*, ou de *em reparação* para *vendido* | O servidor valida cada mudança contra `TRANSICOES` (E1) |
+| 5 | **Ficheiro estragado se o programa falhar a meio** | O `inventario.json` fica meio escrito e ilegível | Grava num ficheiro temporário e só depois o renomeia |
+| 6 | **A ligação do socket cai** | A oficina ou a loja deixam de receber atualizações | As páginas voltam a ligar sozinhas a cada 2 segundos e mostram "Socket: desligado" |
+| 7 | **Mensagens inválidas ou enormes no socket** | JSON partido, tipo desconhecido, mensagens de vários MB | O JSON inválido é ignorado, o tipo desconhecido dá erro e as mensagens acima de 64 KB fecham a ligação |
+| 8 | **Dados inválidos** | Id que não é número, cliente vazio, preço negativo | Validação, com erro 400 e uma mensagem clara |
+| 9 | **Injeção de HTML** | Um nome com código HTML podia alterar a página | As páginas usam `textContent` e nunca inserem HTML vindo dos dados |
+| 10 | **Acesso a ficheiros do servidor** | Um pedido como `/../server.js` podia mostrar o código | O servidor só serve ficheiros de dentro da pasta `public`, e só de tipos conhecidos |
+
+## Limitações (quando a correção deixa de chegar)
+
+- **Vários servidores ao mesmo tempo:** a fila só funciona dentro de um programa. Seria preciso uma base de dados com transações, ou o `UPDATE … WHERE estado = 'pronto'` acima.
+- **Várias unidades do mesmo modelo:** um campo `estado` não chega. É preciso um campo `quantidade`, que nunca pode descer abaixo de zero.
+- **Segurança:** não há login. Qualquer pessoa pode mudar estados ou repor os dados.
+- **Pagamento lento:** na fila, cada venda espera pela anterior. Num site grande, o melhor seria marcar o equipamento como *reservado* durante o pagamento.
+- **Modelo das vendas (E5):** dá a tendência por mês, mas não prevê picos curtos (Black Friday), acontecimentos únicos, nem se um equipamento específico existe.

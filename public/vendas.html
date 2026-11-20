@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vendas do ano — Inventário</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <header>
+    <h1>Vendas ao longo do ano</h1>
+    <nav>
+      <a href="/">Início</a>
+      <a href="oficina.html">Oficina</a>
+      <a href="loja.html">Loja online</a>
+      <a href="vendas.html" class="ativo">Vendas do ano</a>
+    </nav>
+    <div class="etiquetas"><span id="modo" class="modo">…</span></div>
+  </header>
+
+  <main>
+    <!-- E5a -->
+    <h2><span class="estacao">E5a</span>As vendas não são constantes: modelo periódico</h2>
+    <div class="cartao">
+      <p id="resumo"></p>
+      <div id="grafico"></div>
+      <div class="legenda">
+        <span style="--cor:#9a9a9a">Vendas reais</span>
+        <span style="--cor:#c8102e">Mês onde o modelo falha (diferença &gt; 18%)</span>
+        <span style="--cor:#1f5fbf">Modelo V(t)</span>
+      </div>
+
+      <h3 style="font-size:15px;margin-top:20px">Modelo escolhido: função cosseno com período de 12 meses</h3>
+      <div class="formula" id="formula"></div>
+      <ul id="parametros"></ul>
+      <p class="nota">Os parâmetros são calculados a partir dos dados: D é a média dos 12 meses, e A e t₀ são o primeiro harmónico de Fourier, que é o cosseno de período 12 que melhor se ajusta aos dados (mínimos quadrados).</p>
+    </div>
+
+    <h2>Tabela mês a mês</h2>
+    <table>
+      <thead><tr><th>Mês</th><th>Vendas reais</th><th>Modelo</th><th>Diferença</th><th>Vendas anuladas</th><th>Taxa de anulação</th></tr></thead>
+      <tbody id="tabela"></tbody>
+    </table>
+
+    <!-- E5b -->
+    <h2><span class="estacao">E5b</span>Porque é que uma venda anulada custa mais no pico</h2>
+    <div class="cartao" id="pico"></div>
+
+    <h2><span class="estacao">E5b</span>Onde o modelo deixa de servir</h2>
+    <div class="cartao" id="limites"></div>
+  </main>
+
+  <script src="comum.js"></script>
+  <script>
+    const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const MESES_LONGOS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const LIMITE = 0.18; // diferença a partir da qual dizemos que o modelo falha
+    const EXPLICACOES = {
+      8: 'os clientes adiam a compra para o regresso às aulas, por isso as vendas ficam abaixo do previsto.',
+      9: 'regresso às aulas: um salto repentino que uma curva suave não acompanha.',
+      11: 'Black Friday: um pico curto e brusco, causado por uma promoção e não pela estação do ano.',
+    };
+    const numero = (x, casas = 1) => x.toFixed(casas).replace('.', ',');
+
+    (async () => {
+      const { dados } = await obterJSON('/api/vendas-mensais');
+      const meses = dados.meses;
+      const n = meses.length;
+
+      // ---------- Ajuste do modelo V(t) = D + A·cos(2π(t − t0)/12) ----------
+      const D = meses.reduce((soma, m) => soma + m.vendas, 0) / n;
+      let a = 0, b = 0;
+      for (const m of meses) {
+        a += (m.vendas - D) * Math.cos(2 * Math.PI * m.mes / 12);
+        b += (m.vendas - D) * Math.sin(2 * Math.PI * m.mes / 12);
+      }
+      a *= 2 / n; b *= 2 / n;
+      const A = Math.hypot(a, b);
+      let t0 = Math.atan2(b, a) * 12 / (2 * Math.PI);
+      if (t0 <= 0) t0 += 12;
+      const modelo = (t) => D + A * Math.cos(2 * Math.PI * (t - t0) / 12);
+
+      const linhas = meses.map((m) => {
+        const previsto = modelo(m.mes);
+        const diferenca = (m.vendas - previsto) / previsto;
+        return { ...m, previsto, diferenca, falha: Math.abs(diferenca) > LIMITE };
+      });
+
+      const maximo = linhas.reduce((x, y) => (y.vendas > x.vendas ? y : x));
+      const minimo = linhas.reduce((x, y) => (y.vendas < x.vendas ? y : x));
+
+      document.getElementById('resumo').textContent =
+        `Em ${dados.ano}, o mês com mais vendas foi ${MESES_LONGOS[maximo.mes - 1]} (${maximo.vendas}) e o mês com menos foi ` +
+        `${MESES_LONGOS[minimo.mes - 1]} (${minimo.vendas}): ${numero(maximo.vendas / minimo.vendas)} vezes mais. ` +
+        'As vendas sobem e descem e o padrão repete-se todos os anos, por isso usamos uma função periódica.';
+
+      document.getElementById('formula').textContent =
+        `V(t) = ${numero(D)} + ${numero(A)} · cos( 2π (t − ${numero(t0, 2)}) / 12 )`;
+
+      const parametros = document.getElementById('parametros');
+      const mesPico = Math.round(t0) === 0 ? 12 : Math.round(t0);
+      const mesVale = ((mesPico + 5) % 12) + 1;
+      [
+        ['t', 'mês do ano (1 = janeiro, 12 = dezembro)'],
+        ['D = ' + numero(D), 'média de vendas por mês (a linha à volta da qual as vendas oscilam)'],
+        ['A = ' + numero(A), `amplitude: quanto as vendas sobem e descem em relação à média (de cerca de ${Math.round(D - A)} a ${Math.round(D + A)})`],
+        ['12', 'período: o ciclo repete-se de 12 em 12 meses'],
+        ['t₀ = ' + numero(t0, 2), `mês do pico previsto (perto de ${MESES_LONGOS[mesPico - 1]}); o mínimo é 6 meses depois (${MESES_LONGOS[mesVale - 1]})`],
+      ].forEach(([termo, texto]) => parametros.append(el('li', {}, el('b', { text: termo }), ' — ' + texto)));
+
+      desenharGrafico(linhas, modelo);
+
+      // ---------- Tabela ----------
+      const tabela = document.getElementById('tabela');
+      for (const l of linhas) {
+        tabela.append(el('tr', { class: l.falha ? 'falha-modelo' : '' },
+          el('td', { text: MESES_LONGOS[l.mes - 1] }),
+          el('td', { text: l.vendas }),
+          el('td', { text: numero(l.previsto) }),
+          el('td', { text: (l.diferenca > 0 ? '+' : '') + Math.round(l.diferenca * 100) + '%' }),
+          el('td', { text: l.anuladas }),
+          el('td', { text: numero((l.anuladas / l.vendas) * 100) + '%' })
+        ));
+      }
+
+      // ---------- E5b: custo no pico ----------
+      const forte = linhas.filter((l) => l.previsto >= D);
+      const fraco = linhas.filter((l) => l.previsto < D);
+      const soma = (lista, campo) => lista.reduce((s, l) => s + l[campo], 0);
+      const taxaForte = soma(forte, 'anuladas') / soma(forte, 'vendas');
+      const taxaFraca = soma(fraco, 'anuladas') / soma(fraco, 'vendas');
+      const razao = maximo.vendas / minimo.vendas;
+
+      document.getElementById('pico').append(
+        el('p', {}, 'Neste caso, uma ', el('b', { text: 'venda anulada' }),
+          ' é a segunda venda de um equipamento que já não existe: a empresa tem de a cancelar e devolver o dinheiro.'),
+        el('ul', {},
+          el('li', {}, el('b', { text: 'Acontece mais vezes no pico. ' }),
+            `Na metade do ano com mais vendas, ${numero(taxaForte * 100)}% das vendas foram anuladas; na metade mais fraca, ${numero(taxaFraca * 100)}%. ` +
+            `Com ${numero(razao)} vezes mais vendas, a probabilidade de duas compras do mesmo equipamento coincidirem cresce aproximadamente com o quadrado (cerca de ${Math.round(razao * razao)} vezes).`),
+          el('li', {}, el('b', { text: 'O cliente não tem alternativa. ' }),
+            'No Natal ou na Black Friday o cliente quer o equipamento para uma data certa. Se a venda for anulada, já não tem tempo para esperar e compra à concorrência: a empresa perde a venda e o cliente.'),
+          el('li', {}, el('b', { text: 'Custa mais trabalho quando há menos tempo. ' }),
+            'Reembolsos, telefonemas e reclamações chegam quando a equipa já está sobrecarregada com o pico de encomendas.'),
+          el('li', {}, el('b', { text: 'A confiança perde-se à frente de mais gente. ' }),
+            'No pico há mais clientes, mais comentários e mais avaliações: uma má experiência é vista por mais pessoas.'),
+          el('li', {}, el('b', { text: 'Fora do pico é diferente. ' }),
+            `Em ${MESES_LONGOS[minimo.mes - 1]}, com ${minimo.vendas} vendas, uma venda dupla é rara e o cliente pode esperar ou escolher outro equipamento com calma.`)
+        )
+      );
+
+      // ---------- E5b: limites do modelo ----------
+      const falhas = linhas.filter((l) => l.falha);
+      const listaFalhas = el('ul');
+      for (const l of falhas) {
+        listaFalhas.append(el('li', {},
+          el('b', { text: `${MESES_LONGOS[l.mes - 1][0].toUpperCase() + MESES_LONGOS[l.mes - 1].slice(1)} (${l.diferenca > 0 ? '+' : ''}${Math.round(l.diferenca * 100)}%): ` }),
+          EXPLICACOES[l.mes] || 'as vendas afastam-se muito do previsto.'
+        ));
+      }
+      document.getElementById('limites').append(
+        el('p', { text: `O modelo serve para ver a tendência geral, mas falha em ${falhas.length} meses (diferença maior que ${Math.round(LIMITE * 100)}%):` }),
+        listaFalhas,
+        el('p', { text: 'Também deixa de servir quando:' }),
+        el('ul', {},
+          el('li', { text: 'há acontecimentos que não se repetem todos os anos: crises económicas, falta de stock, um concorrente novo;' }),
+          el('li', { text: 'se quer prever um dia concreto: o modelo dá médias por mês, não picos de uma hora;' }),
+          el('li', {}, 'se quer saber se um equipamento ', el('b', { text: 'específico' }),
+            ' ainda existe: o modelo diz quantas vendas haverá, mas isso só o campo "estado" do inventário responde (E2).')
+        )
+      );
+    })();
+
+    function desenharGrafico(linhas, modelo) {
+      const L = 760, H = 320, m = { cima: 20, direita: 20, baixo: 36, esquerda: 44 };
+      const larguraUtil = L - m.esquerda - m.direita;
+      const alturaUtil = H - m.cima - m.baixo;
+      const yMax = Math.ceil(Math.max(...linhas.map((l) => Math.max(l.vendas, l.previsto))) / 20) * 20;
+      const x = (t) => m.esquerda + ((t - 0.5) / 12) * larguraUtil;
+      const y = (v) => m.cima + alturaUtil - (v / yMax) * alturaUtil;
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = (tag, atributos, texto) => {
+        const elemento = document.createElementNS(ns, tag);
+        for (const [k, v] of Object.entries(atributos)) elemento.setAttribute(k, v);
+        if (texto !== undefined) elemento.textContent = texto;
+        return elemento;
+      };
+
+      const raiz = svg('svg', { viewBox: `0 0 ${L} ${H}`, width: '100%', role: 'img', 'aria-label': 'Vendas por mês e modelo periódico' });
+
+      for (let v = 0; v <= yMax; v += 20) {
+        raiz.append(svg('line', { x1: m.esquerda, x2: L - m.direita, y1: y(v), y2: y(v), stroke: '#e5e5e5' }));
+        raiz.append(svg('text', { x: m.esquerda - 8, y: y(v) + 4, 'text-anchor': 'end', 'font-size': 11, fill: '#666' }, v));
+      }
+
+      const largura = (larguraUtil / 12) * 0.6;
+      const etiquetas = []; // números por cima das barras, desenhados por cima da curva
+      for (const l of linhas) {
+        const barra = svg('rect', {
+          x: x(l.mes) - largura / 2, y: y(l.vendas), width: largura, height: y(0) - y(l.vendas),
+          fill: l.falha ? '#c8102e' : '#9a9a9a', rx: 2,
+        });
+        barra.append(svg('title', {}, `${MESES[l.mes - 1]}: ${l.vendas} vendas (modelo: ${l.previsto.toFixed(1)})`));
+        raiz.append(barra);
+        etiquetas.push(svg('text', { x: x(l.mes), y: y(l.vendas) - 5, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 'bold', fill: '#333', stroke: '#fff', 'stroke-width': 4, 'paint-order': 'stroke' }, l.vendas));
+        raiz.append(svg('text', { x: x(l.mes), y: H - m.baixo + 18, 'text-anchor': 'middle', 'font-size': 12, fill: '#333' }, MESES[l.mes - 1]));
+      }
+
+      let pontos = '';
+      for (let t = 0.5; t <= 12.5; t += 0.05) pontos += `${x(t).toFixed(1)},${y(modelo(t)).toFixed(1)} `;
+      raiz.append(svg('polyline', { points: pontos, fill: 'none', stroke: '#1f5fbf', 'stroke-width': 3 }));
+      raiz.append(...etiquetas);
+
+      raiz.append(svg('text', { x: 12, y: m.cima + alturaUtil / 2, transform: `rotate(-90 12 ${m.cima + alturaUtil / 2})`, 'text-anchor': 'middle', 'font-size': 12, fill: '#666' }, 'Vendas (equipamentos)'));
+      document.getElementById('grafico').append(raiz);
+    }
+  </script>
+</body>
+</html>

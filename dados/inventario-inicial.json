@@ -1,0 +1,59 @@
+[
+  {
+    "id": 1038, "equipamento": "Asus VivoBook 15", "preco": 249, "estado": "pronto", "dataVenda": null, "cliente": null,
+    "historico": [
+      { "estado": "em_reparacao", "data": "2026-11-02 10:05:00", "origem": "oficina", "motivo": "Entrada na oficina" },
+      { "estado": "pronto", "data": "2026-11-06 15:20:00", "origem": "oficina", "motivo": "Reparação concluída e testada" }
+    ]
+  },
+  {
+    "id": 1039, "equipamento": "Acer Aspire 5", "preco": 229, "estado": "em_reparacao", "dataVenda": null, "cliente": null,
+    "historico": [
+      { "estado": "em_reparacao", "data": "2026-11-12 09:40:00", "origem": "oficina", "motivo": "Entrada na oficina" }
+    ]
+  },
+  {
+    "id": 1040, "equipamento": "MacBook Air 2017", "preco": 399, "estado": "vendido", "dataVenda": "2026-11-08 10:12:00", "cliente": "C-191",
+    "historico": [
+      { "estado": "em_reparacao", "data": "2026-10-28 11:00:00", "origem": "oficina", "motivo": "Entrada na oficina" },
+      { "estado": "pronto", "data": "2026-11-04 16:45:00", "origem": "oficina", "motivo": "Reparação concluída e testada" },
+      { "estado": "vendido", "data": "2026-11-08 10:12:00", "origem": "loja", "motivo": "Venda confirmada (pagamento feito)" }
+    ]
+  },
+  {
+    "id": 1041, "equipamento": "HP EliteBook 840 G5", "preco": 299, "estado": "em_reparacao", "dataVenda": null, "cliente": null,
+    "historico": [
+      { "estado": "em_reparacao", "data": "2026-11-05 14:10:00", "origem": "oficina", "motivo": "Entrada na oficina" },
+      { "estado": "pronto", "data": "2026-11-11 12:00:00", "origem": "oficina", "motivo": "Reparação concluída e testada" },
+      { "estado": "em_reparacao", "data": "2026-11-13 09:30:00", "origem": "oficina", "motivo": "Defeito detetado, volta à reparação" }
+    ]
+  },
+  {
+    "id": 1042, "equipamento": "Lenovo ThinkPad T480", "preco": 349, "estado": "pronto", "dataVenda": null, "cliente": null,
+    "historico": [
+      { "estado": "em_reparacao", "data": "2026-11-03 09:15:00", "origem": "oficina", "motivo": "Entrada na oficina" },
+      { "estado": "pronto", "data": "2026-11-12 17:30:00", "origem": "oficina", "motivo": "Reparação concluída e testada" }
+    ]
+  },
+  {
+    "id": 1043, "equipamento": "Dell Latitude 5490", "preco": 279, "estado": "vendido", "dataVenda": "2026-11-10 16:40:00", "cliente": "C-198",
+    "historico": [
+      { "estado": "em_reparacao", "data": "2026-10-30 10:20:00", "origem": "oficina", "motivo": "Entrada na oficina" },
+      { "estado": "pronto", "data": "2026-11-07 11:15:00", "origem": "oficina", "motivo": "Reparação concluída e testada" },
+      { "estado": "vendido", "data": "2026-11-10 16:40:00", "origem": "loja", "motivo": "Venda confirmada (pagamento feito)" }
+    ]
+  },
+  {
+    "id": 1044, "equipamento": "HP ProBook 450 G6", "preco": 269, "estado": "pronto", "dataVenda": null, "cliente": null,
+    "historico": [
+      { "estado": "em_reparacao", "data": "2026-11-06 10:00:00", "origem": "oficina", "motivo": "Entrada na oficina" },
+      { "estado": "pronto", "data": "2026-11-14 18:05:00", "origem": "oficina", "motivo": "Reparação concluída e testada" }
+    ]
+  },
+  {
+    "id": 1045, "equipamento": "Lenovo IdeaPad 3", "preco": 239, "estado": "em_reparacao", "dataVenda": null, "cliente": null,
+    "historico": [
+      { "estado": "em_reparacao", "data": "2026-11-16 15:30:00", "origem": "oficina", "motivo": "Entrada na oficina" }
+    ]
+  }
+]

@@ -1,8 +1,0 @@
-[
-  { "numeroSerie": "INF-0001", "nome": "Portátil Dell Latitude 5490", "preco": 249, "estado": "pronto" },
-  { "numeroSerie": "INF-0002", "nome": "Desktop HP EliteDesk 800", "preco": 179, "estado": "pronto" },
-  { "numeroSerie": "INF-0003", "nome": "Monitor Lenovo 24 polegadas", "preco": 69, "estado": "em reparação" },
-  { "numeroSerie": "INF-0004", "nome": "Portátil Lenovo ThinkPad T480", "preco": 289, "estado": "pronto" },
-  { "numeroSerie": "INF-0005", "nome": "Desktop Dell OptiPlex 3050", "preco": 159, "estado": "vendido" },
-  { "numeroSerie": "INF-0006", "nome": "Portátil HP ProBook 450", "preco": 219, "estado": "em reparação" }
-]
